@@ -1,0 +1,29 @@
+{
+    "s3": {
+        "name": "s3",
+        "aws_secret_key": "w6C86oNJzDlQAmtwrUFwJOOilVH2Uh5QI8gfDj26",
+        "aws_access_key": "AKIAICCBKD75OAGVXOLA",
+        "aws_bucket_name": "test-wpengine-backups"
+    },
+    "dropbox": {
+        "name": "dropbox",
+        "secret_key": "",
+        "access_key": ""
+    },
+    "sftp": {
+        "name": "sftp",
+        "host": "",
+        "username": "",
+        "password": "",
+        "port": "",
+        "path": ""
+    },
+    "ftp": {
+        "name": "ftp",
+        "host": "",
+        "username": "",
+        "password": "",
+        "port": "",
+        "path": ""
+    }
+}
