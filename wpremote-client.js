@@ -5,8 +5,19 @@ var async = require('async');
 var backupLocations = require('./backup_locations.json');
 var apiURL = 'https://wpremote.com/api/json/site/';
 var path = require('path');
+var i18n = require("i18n");
 var methods = {};
 var remote;
+
+i18n.configure({
+    locales: ['en'],
+    directory: __dirname + '/locales',
+    defaultLocale: 'en',
+});
+
+// Sets language function
+__ = i18n.__;
+
 
 function checkBackupDownloadURL(site, callback, timeout, frequency) {
     timeout = (_.isUndefined(timeout) ? 60000 : timeout);
@@ -18,13 +29,11 @@ function checkBackupDownloadURL(site, callback, timeout, frequency) {
         // check if timeout has been reached
         if ((Math.abs(new Date() - start)) <= timeout) {
             // check on archive creation status
-            remote.get(site.ID + '/download').on('success', function(body, response) {
+            makeRequest('get', site.ID + '/download', function(body, response) {
                 // respond with archive URL
                 if (body.status == 'backup-complete') {
                     clearInterval(interval);
                     callback(site, body.url);
-                } else {
-                    console.log(site.url, 'has a backup status of:', body.status);
                 }
             });
         } else {
@@ -38,16 +47,18 @@ function checkBackupDownloadURL(site, callback, timeout, frequency) {
 var backupArchive = function(site, location) {
     // Eventually we will attached location backup workflow to the actual location object
     var callback = function(site, archiveFileURL) {
-        console.log('This website:', site.url, 'has been backed up and the archive can be downloaded at:', archiveFileURL);
+        console.log('Backup created for', site.url, 'and can be downloaded at:', archiveFileURL);
 
         var cbFinished = function(error, response) {
-            console.log('Upload finished to', location.name, 'for site', site.url);
-            if (error)
-                console.log('cbFinished with error', error);
-
-            remote.del(site.ID + '/download').on('success', function(body, response) {
+            makeRequest('del', site.ID + '/download', function(body, response) {
                 console.log('Deleted backup for:', site.url);
             });
+
+            if (error) {
+                throw error;
+            } else {
+                console.log('Upload finished for', site.url, 'at location:', location.name);
+            }
         };
 
         var backupInstance = require(path.resolve('backup_modules', location.name));
@@ -58,8 +69,16 @@ var backupArchive = function(site, location) {
     checkBackupDownloadURL(site, callback);
 };
 
+function getRequestURL(response) {
+    return url.resolve(apiURL, response.req.path);
+}
+
 function archive(locationId, siteId) {
-    var location = _.get(backupLocations, locationId, {});
+    var location = _.get(backupLocations, locationId, null);
+
+    if (!location)
+        throw new Error(__('missing %s', 'location id'));
+
     getSites(doArchive.bind(null, location, backupArchive), siteId);
 }
 
@@ -73,8 +92,8 @@ var doArchive = function(location, callback, sites) {
 };
 
 function getSites(callback, siteId) {
-    var path = !_.isUndefined(siteId) ? siteId : '';
-    remote.get(path).on('success', function(body, response) {
+    var uri = !_.isUndefined(siteId) ? siteId : '';
+    makeRequest('get', uri, function(body, response) {
         // Always pass an array of object(s) to call back
         if (_.isArray(body)) {
             callback(body);
@@ -86,8 +105,43 @@ function getSites(callback, siteId) {
     });
 }
 
+function makeRequest(type, uri, successCallback, additionalCallbacks) {
+    if (!_.isFunction(successCallback))
+        throw new Error(__('missing %s', 'successCallback'));
+
+    // Overrideable Callback
+    var defaultCallback = {
+        error: function(err, response) {
+            console.log(err);
+        },
+        fail: function(data, response) {
+            if (response.statusCode >= 400)
+                console.log('Status is', response.statusCode, 'for URL:', getRequestURL(response));
+        },
+        timeout: function(ms) {
+            console.log("Request timed out after:", ms);
+        },
+        complete: function(result, response) {},
+    };
+
+    // Override Default callbacks if provided
+    _(defaultCallback).forEach(function(callback, type) {
+        if (_.has(additionalCallbacks, type)) {
+            defaultCallback[type] = additionalCallbacks[type];
+        }
+    });
+
+    // Execute call and attached callbacks
+    remote[type](uri)
+        .on('success', successCallback)
+        .on('error', defaultCallback.error)
+        .on('fail', defaultCallback.fail)
+        .on('timeout', defaultCallback.timeout)
+        .on('complete', defaultCallback.complete);
+}
+
 function archiveSingleSite(site, location, callback) {
-    remote.post(site.ID + '/download').on('success', function(body, response) {
+    makeRequest('post', site.ID + '/download', function(body, response) {
         console.log('Archive creation in progress for:', site.url);
 
         callback(site, location);
