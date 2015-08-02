@@ -1,9 +1,10 @@
 {
     "s3": {
         "name": "s3",
-        "aws_secret_key": "w6C86oNJzDlQAmtwrUFwJOOilVH2Uh5QI8gfDj26",
-        "aws_access_key": "AKIAICCBKD75OAGVXOLA",
-        "aws_bucket_name": "test-wpengine-backups"
+        "provider": "amazon",
+        "key": "w6C86oNJzDlQAmtwrUFwJOOilVH2Uh5QI8gfDj26",
+        "keyId": "AKIAICCBKD75OAGVXOLA",
+        "container": "test-wpengine-backups"
     },
     "dropbox": {
         "name": "dropbox",

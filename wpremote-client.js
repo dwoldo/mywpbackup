@@ -18,8 +18,7 @@ i18n.configure({
 // Sets language function
 __ = i18n.__;
 
-
-function checkBackupDownloadURL(site, callback, timeout, frequency) {
+function waitForArchiveCreation(site, location, callback, timeout, frequency) {
     timeout = (_.isUndefined(timeout) ? 60000 : timeout);
     frequency = (_.isUndefined(frequency) ? 2000 : frequency);
     var start = new Date();
@@ -33,7 +32,8 @@ function checkBackupDownloadURL(site, callback, timeout, frequency) {
                 // respond with archive URL
                 if (body.status == 'backup-complete') {
                     clearInterval(interval);
-                    callback(site, body.url);
+                    console.log('Backup created for', site.url, 'and can be downloaded at:', body.url);
+                    callback(site, body.url, location);
                 }
             });
         } else {
@@ -44,29 +44,31 @@ function checkBackupDownloadURL(site, callback, timeout, frequency) {
     }, frequency);
 }
 
-var backupArchive = function(site, location) {
-    // Eventually we will attached location backup workflow to the actual location object
-    var callback = function(site, archiveFileURL) {
-        console.log('Backup created for', site.url, 'and can be downloaded at:', archiveFileURL);
+var copyArchiveToRemote = function(site, archiveFileURL, location, callback) {
+    var instance = require(path.resolve('backup_modules', location.name));
+    var backupInstance = new instance(location);
 
-        var cbFinished = function(error, response) {
-            makeRequest('del', site.ID + '/download', function(body, response) {
-                console.log('Deleted backup for:', site.url);
-            });
-
-            if (error) {
-                throw error;
-            } else {
-                console.log('Upload finished for', site.url, 'at location:', location.name);
-            }
-        };
-
-        var backupInstance = require(path.resolve('backup_modules', location.name));
-        backupInstance.init(location);
-        backupInstance.upload(archiveFileURL, cbFinished);
+    var cbComplete = function(site, File) {
+        console.log(File);
+        console.log('Backup archive uploaded to remote server');
+        deleteSingleSiteArchive(site, File);
     };
 
-    checkBackupDownloadURL(site, callback);
+    if (!_.isUndefined(callback)) cbComplete = callback;
+
+    backupInstance.upload(archiveFileURL, cbComplete);
+};
+
+var deleteSingleSiteArchive = function(site, File, done) {
+    makeRequest('del', site.ID + '/download', function(body, response) {
+        console.log('Deleted original website backup for:', site.url);
+        done();
+    });
+};
+
+var backupArchive = function(site, location) {
+    // Eventually we will attached location backup workflow to the actual location object
+    waitForArchiveCreation(site, location, copyArchiveToRemote);
 };
 
 function getRequestURL(response) {
@@ -81,7 +83,6 @@ function archive(locationId, siteId) {
 
     getSites(doArchive.bind(null, location, backupArchive), siteId);
 }
-
 
 var doArchive = function(location, callback, sites) {
     if (!_.isUndefined(location) && !_.isUndefined(sites)) {
@@ -109,17 +110,22 @@ function makeRequest(type, uri, successCallback, additionalCallbacks) {
     if (!_.isFunction(successCallback))
         throw new Error(__('missing %s', 'successCallback'));
 
+    // Convert numbers to string
+    uri = uri.toString();
+
     // Overrideable Callback
     var defaultCallback = {
         error: function(err, response) {
-            console.log(err);
+            throw new Error(err);
         },
         fail: function(data, response) {
-            if (response.statusCode >= 400)
-                console.log('Status is', response.statusCode, 'for URL:', getRequestURL(response));
+            if (response.statusCode >= 400) {
+                throw new Error(response.req.method + ' Status is ' +
+                    response.statusCode + ' for URL: ' + getRequestURL(response));
+            }
         },
         timeout: function(ms) {
-            console.log("Request timed out after:", ms);
+            throw new Error("Request timed out after: " + ms);
         },
         complete: function(result, response) {},
     };
@@ -159,7 +165,15 @@ function mixin(target, source) {
 
 // Set the available methods to be exported
 mixin(methods, {
-    backup: archive
+    backup: archive,
+    _makeRequest: makeRequest,
+    _archiveSingleSite: archiveSingleSite,
+    _getSites: getSites,
+    _doArchive: doArchive,
+    _copyArchiveToRemote: copyArchiveToRemote,
+    _waitForArchiveCreation: waitForArchiveCreation,
+    _deleteSingleSiteArchive: deleteSingleSiteArchive
+
 });
 
 var WPRemote = restler.service(function(apiKey) {

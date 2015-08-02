@@ -13,7 +13,14 @@
     "aws-sdk": "^2.1.39",
     "i18n": "^0.5.0",
     "lodash": "^3.10.0",
+    "log4js": "^0.6.26",
+    "pkgcloud": "^1.2.0-alpha.0",
     "request": "^2.60.0",
     "restler": "^3.3.0"
+  },
+  "devDependencies": {
+    "async": "^1.4.0",
+    "chai": "^3.2.0",
+    "simple-mock": "^0.3.1"
   }
 }

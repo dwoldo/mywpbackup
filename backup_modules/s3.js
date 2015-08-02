@@ -1,52 +1,38 @@
-var AWS = require('aws-sdk');
-var request = require('request');
-var _ = require('lodash');
-var path = require('path');
+var request = require('request'),
+    _ = require('lodash'),
+    path = require('path'),
+    pkgcloud = require('pkgcloud');
 
-AWS.config.apiVersions = {
-    s3: '2006-03-01'
+var client = function(config) {
+    if (!config || _.isUndefined(config.keyId) || _.isUndefined(config.key) || _.isUndefined(config.provider)) {
+        throw Error("Missing S3 config");
+    }
+    this.config = config;
+    this.client = pkgcloud.storage.createClient(config);
 };
 
-var s3;
+client.prototype = {
+    upload: function(file, callback) {
+        var date = new Date();
 
-var setup = function(config) {
-    var params = {};
+        var folderName = date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate();
+        var params = {
+            container: this.config.container,
+            remote: path.join(folderName, path.basename(file))
+        };
 
-    if (!_.isUndefined(config.aws_access_key) && !_.isUndefined(config.aws_secret_key)) {
-        AWS.config.update({
-            accessKeyId: config.aws_access_key,
-            secretAccessKey: config.aws_secret_key
-        });
-    }
+        var readStream = request(file)
+            .on('error', function(err) {
+                throw err;
+            });
 
-    if (!_.isUndefined(config.aws_bucket_name)) {
-        params.Bucket = config.aws_bucket_name;
-    }
-
-    s3 = new AWS.S3({
-        params: params
-    });
-};
-
-var put_from_url = function(url, callback) {
-    request({
-        url: url,
-        encoding: null
-    }, function(err, res, body) {
-
-        if (err)
+        var writeStream = this.client.upload(params);
+        writeStream.on('error', function(err) {
             throw err;
+        }).on('success', callback);
 
-        s3.upload({
-            Key: path.basename(url),
-            ContentType: res.headers['content-type'],
-            ContentLength: res.headers['content-length'],
-            Body: body // buffer
-        }, callback);
-    });
+        readStream.pipe(writeStream);
+    }
 };
 
-module.exports = {
-    init: setup,
-    upload: put_from_url
-};
+module.exports = client;
