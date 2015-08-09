@@ -10,6 +10,8 @@ var client = null;
 before(function() {
     var apiKey = '3A891BD055ACC83DB99F7C10C25C7499';
     client = new WPRemote(apiKey);
+    client.baseURL = 'http://localhost:3000/';
+    var server = require('../server/server')();
 });
 
 describe('wp websites', function() {
@@ -24,14 +26,7 @@ describe('wp websites', function() {
     });
 
     it('should get one registered websites', function(done) {
-        var siteID;
-        before(function(done) {
-            // Get first site id from all available sites
-            client._getSites(function(sites) {
-                siteID = sites[0].ID;
-                done();
-            });
-        });
+        var siteID = 123456;
 
         client._getSites(function(sites) {
             assert(Array.isArray(sites) && sites.length == 1);
@@ -89,9 +84,6 @@ describe('wp website archive', function() {
     it('should delete archive from original website', function(done) {
         client._deleteSingleSiteArchive(site, {}, done);
     });
-
-
-
 });
 
 

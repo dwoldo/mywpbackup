@@ -24,7 +24,9 @@ function waitForArchiveCreation(site, location, callback, timeout, frequency) {
     var start = new Date();
 
     // Check for a download URL ever
-    var interval = setInterval(function() {
+    var checking = false;
+    var checkForArchiveCreationComplete = function() {
+        checking = true;
         // check if timeout has been reached
         if ((Math.abs(new Date() - start)) <= timeout) {
             // check on archive creation status
@@ -33,15 +35,21 @@ function waitForArchiveCreation(site, location, callback, timeout, frequency) {
                 if (body.status == 'backup-complete') {
                     clearInterval(interval);
                     console.log('Backup created for', site.url, 'and can be downloaded at:', body.url);
+                    checking = false;
                     callback(site, body.url, location);
                 }
             });
+            checking = false;
         } else {
             console.log("Timeout for archive creation expired");
             // timeout reached
+            checking = false;
             clearInterval(interval);
         }
-    }, frequency);
+    };
+    // Set frquency
+    var interval = setInterval(checkForArchiveCreationComplete, frequency);
+    checkForArchiveCreationComplete();
 }
 
 var copyArchiveToRemote = function(site, archiveFileURL, location, callback) {
@@ -92,8 +100,17 @@ var doArchive = function(location, callback, sites) {
     }
 };
 
+function archiveSingleSite(site, location, callback) {
+    makeRequest('post', site.ID + '/download', function(body, response) {
+        console.log('Archive creation in progress for:', site.url);
+
+        callback(site, location);
+    });
+}
+
 function getSites(callback, siteId) {
     var uri = !_.isUndefined(siteId) ? siteId : '';
+
     makeRequest('get', uri, function(body, response) {
         // Always pass an array of object(s) to call back
         if (_.isArray(body)) {
@@ -146,13 +163,6 @@ function makeRequest(type, uri, successCallback, additionalCallbacks) {
         .on('complete', defaultCallback.complete);
 }
 
-function archiveSingleSite(site, location, callback) {
-    makeRequest('post', site.ID + '/download', function(body, response) {
-        console.log('Archive creation in progress for:', site.url);
-
-        callback(site, location);
-    });
-}
 
 function mixin(target, source) {
     source = source || {};

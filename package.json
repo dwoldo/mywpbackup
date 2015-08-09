@@ -21,6 +21,7 @@
   "devDependencies": {
     "async": "^1.4.0",
     "chai": "^3.2.0",
+    "express": "^4.13.3",
     "simple-mock": "^0.3.1"
   }
 }
