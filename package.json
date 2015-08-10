@@ -1,29 +1,23 @@
 {
     "name": "mywp",
     "version": "0.0.1",
-    "description": "",
-    "main": "index.js",
+    "description": "Manage remote WP websites via wpremote.com API",
+    "main": "server.js",
     "scripts": {
         "test": "NODE_ENV=test mocha tests/** && NODE_ENV=",
         "start dev": "NODE_ENV=development node server.js",
         "start prod": "NODE_ENV=production node server.js"
     },
-    "author": "",
-    "license": "ISC",
+    "author": "David Garza",
     "dependencies": {
-        "async": "^1.3.0",
-        "aws-sdk": "^2.1.39",
         "i18n": "^0.5.0",
         "lodash": "^3.10.0",
-        "log4js": "^0.6.26",
         "pkgcloud": "^1.2.0-alpha.0",
         "request": "^2.60.0",
         "restler": "^3.3.0"
     },
     "devDependencies": {
-        "async": "^1.4.0",
         "chai": "^3.2.0",
-        "express": "^4.13.3",
-        "simple-mock": "^0.3.1"
+        "express": "^4.13.3"
     }
 }

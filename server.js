@@ -4,15 +4,6 @@ var client = new WPRemote(apiKey);
 
 // Perform backup of all websites
 client.backup('s3');
-// WPRemote(apiKey).backup('s3', 12334);
 
-// Make RESTful requests
-// client.get('site').on('success', function(body, response) {
-//
-// }).on('fail', function(body, response) {
-//     console.log("fail", response.statusCode, response.req.path);
-// });
-//
-// var backup = function(siteId, location) {
-//
-// };
+// Backup Only one site
+//client.backup('s3', 123456);

@@ -1,7 +1,6 @@
 var restler = require('restler');
 var _ = require('lodash');
 var url = require('url');
-var async = require('async');
 var backupLocations = require('./backup_locations.json');
 var apiURL = 'https://wpremote.com/api/json/site/';
 var path = require('path');

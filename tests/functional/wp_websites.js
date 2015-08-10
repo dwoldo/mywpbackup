@@ -1,7 +1,5 @@
 // force the test environment to 'test'
-var async = require('async');
 var assert = require("assert");
-var simple = require('simple-mock');
 var WPRemote = require('../../wpremote-client.js');
 var backupLocations = require('../../backup_locations.json');
 var server = null;
