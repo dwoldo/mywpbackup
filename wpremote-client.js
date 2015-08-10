@@ -6,6 +6,7 @@ var backupLocations = require('./backup_locations.json');
 var apiURL = 'https://wpremote.com/api/json/site/';
 var path = require('path');
 var i18n = require("i18n");
+var LOG = require(path.resolve('utils', 'log.js'));
 var methods = {};
 var remote;
 
@@ -18,65 +19,68 @@ i18n.configure({
 // Sets language function
 __ = i18n.__;
 
-function waitForArchiveCreation(site, location, callback, timeout, frequency) {
+function waitForArchiveCreation(site, onArchiveCreated, timeout, frequency) {
     timeout = (_.isUndefined(timeout) ? 60000 : timeout);
     frequency = (_.isUndefined(frequency) ? 2000 : frequency);
-    var start = new Date();
 
-    // Check for a download URL ever
-    var checking = false;
-    var checkForArchiveCreationComplete = function() {
-        checking = true;
-        // check if timeout has been reached
+    var start = new Date();
+    var finished = function(site, url) {
+        clearInterval(interval);
+        onArchiveCreated(site, url);
+    };
+
+    var interval = setInterval(function() {
         if ((Math.abs(new Date() - start)) <= timeout) {
-            // check on archive creation status
-            makeRequest('get', site.ID + '/download', function(body, response) {
-                // respond with archive URL
-                if (body.status == 'backup-complete') {
-                    clearInterval(interval);
-                    console.log('Backup created for', site.url, 'and can be downloaded at:', body.url);
-                    checking = false;
-                    callback(site, body.url, location);
-                }
-            });
-            checking = false;
+            getArchiveURL(site, finished);
         } else {
-            console.log("Timeout for archive creation expired");
+            LOG("Timeout for archive creation expired");
             // timeout reached
-            checking = false;
             clearInterval(interval);
         }
-    };
-    // Set frquency
-    var interval = setInterval(checkForArchiveCreationComplete, frequency);
-    checkForArchiveCreationComplete();
+    }, frequency);
+
+    getArchiveURL(site, finished);
+
 }
+
+var getArchiveURL = function(site, callback) {
+    // get archive creation status
+    makeRequest('get', site.ID + '/download', function(body, response) {
+        // respond with archive URL
+        if (body.status == 'backup-complete') {
+            LOG('Backup created for', site.url, 'and can be downloaded at:', body.url);
+            callback(site, body.url);
+        }
+    });
+};
 
 var copyArchiveToRemote = function(site, archiveFileURL, location, callback) {
     var instance = require(path.resolve('backup_modules', location.name));
     var backupInstance = new instance(location);
 
-    var cbComplete = function(site, File) {
-        console.log(File);
-        console.log('Backup archive uploaded to remote server');
-        deleteSingleSiteArchive(site, File);
-    };
-
-    if (!_.isUndefined(callback)) cbComplete = callback;
-
-    backupInstance.upload(archiveFileURL, cbComplete);
+    backupInstance.upload(archiveFileURL, callback);
 };
 
-var deleteSingleSiteArchive = function(site, File, done) {
+var deleteSingleSiteArchive = function(site, File, callback) {
     makeRequest('del', site.ID + '/download', function(body, response) {
-        console.log('Deleted original website backup for:', site.url);
-        done();
+        LOG('Deleted original website backup for:', site.url);
+        if (typeof callback == 'function') callback(site, File);
     });
 };
 
-var backupArchive = function(site, location) {
+var backupArchive = function(site, location, body) {
     // Eventually we will attached location backup workflow to the actual location object
-    waitForArchiveCreation(site, location, copyArchiveToRemote);
+    var finished = function(site, fileArchiveURL) {
+        LOG("here!!!!!!!!!!!");
+        var onArchiveUploaded = function(File) {
+            LOG('Backup archive uploaded to remote server');
+            deleteSingleSiteArchive(site, File);
+        };
+
+        copyArchiveToRemote(site, fileArchiveURL, location, onArchiveUploaded);
+    };
+
+    waitForArchiveCreation(site, finished);
 };
 
 function getRequestURL(response) {
@@ -89,23 +93,15 @@ function archive(locationId, siteId) {
     if (!location)
         throw new Error(__('missing %s', 'location id'));
 
-    getSites(doArchive.bind(null, location, backupArchive), siteId);
-}
-
-var doArchive = function(location, callback, sites) {
-    if (!_.isUndefined(location) && !_.isUndefined(sites)) {
+    // What to do after getting a site or array of sites
+    var callback = function(location, sites) {
         sites.forEach(function(site) {
-            archiveSingleSite(site, location, callback);
+            archiveSingleSite(site, location, backupArchive);
         });
-    }
-};
+    }.bind(null, location);
 
-function archiveSingleSite(site, location, callback) {
-    makeRequest('post', site.ID + '/download', function(body, response) {
-        console.log('Archive creation in progress for:', site.url);
-
-        callback(site, location);
-    });
+    // Begin magic
+    getSites(callback, siteId);
 }
 
 function getSites(callback, siteId) {
@@ -118,8 +114,16 @@ function getSites(callback, siteId) {
         } else if (_.isPlainObject(body)) {
             callback([body]);
         } else {
-            console.log("Unknown response, cannot continue");
+            LOG("Unknown response, cannot continue");
         }
+    });
+}
+
+function archiveSingleSite(site, location, callback) {
+    makeRequest('post', site.ID + '/download', function(body, response) {
+        LOG('Archive creation in progress for:', site.url);
+
+        callback(site, location, body);
     });
 }
 
@@ -179,10 +183,10 @@ mixin(methods, {
     _makeRequest: makeRequest,
     _archiveSingleSite: archiveSingleSite,
     _getSites: getSites,
-    _doArchive: doArchive,
     _copyArchiveToRemote: copyArchiveToRemote,
     _waitForArchiveCreation: waitForArchiveCreation,
-    _deleteSingleSiteArchive: deleteSingleSiteArchive
+    _deleteSingleSiteArchive: deleteSingleSiteArchive,
+    _checkForArchiveCreationComplete: getArchiveURL
 
 });
 
@@ -192,7 +196,7 @@ var WPRemote = restler.service(function(apiKey) {
         this.defaults.password = '';
         remote = this;
     } else {
-        console.log("Missing API Key");
+        LOG("Missing API Key");
     }
 }, {
     baseURL: apiURL

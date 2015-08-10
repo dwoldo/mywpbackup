@@ -4,19 +4,23 @@ var assert = require("assert");
 var simple = require('simple-mock');
 var WPRemote = require('../../wpremote-client.js');
 var backupLocations = require('../../backup_locations.json');
-
+var server = null;
 var client = null;
+var defaultSiteID = 123456;
 
 before(function() {
-    var apiKey = '3A891BD055ACC83DB99F7C10C25C7499';
+    // Set test API key and create client
+    var apiKey = 'TESTAPIKEY';
     client = new WPRemote(apiKey);
+
+    // Override default baseURL for HTTP(s) requests
     client.baseURL = 'http://localhost:3000/';
-    var server = require('../server/server')();
+
+    // Create server with port number
+    server = require('../server/server')(3000);
 });
 
 describe('wp websites', function() {
-    this.timeout(20000);
-
     it('should get all registered websites', function(done) {
         var callback = function(sites) {
             assert(Array.isArray(sites) && sites.length > 0);
@@ -26,38 +30,26 @@ describe('wp websites', function() {
     });
 
     it('should get one registered websites', function(done) {
-        var siteID = 123456;
-
         client._getSites(function(sites) {
             assert(Array.isArray(sites) && sites.length == 1);
             done();
-        }, siteID);
+        }, defaultSiteID);
     });
 });
 
 describe('wp website archive', function() {
-    this.timeout(20000);
     var location;
-    var site;
+    var archiveCreationTimeout = 62000;
+    var defaultSite;
 
     before(function(done) {
         // Get first site id from all available sites
         var callback = function(sites) {
-            site = sites[0];
+            defaultSite = sites[0];
             done();
         };
 
-        client._getSites(callback);
-
-        // init the location object
-        // location = new location_s3(backupLocations.s3);
-
-        // stub the location object
-        // simple.mock(location, 'upload').callFn(function(file, callback) {
-        //     var File = function() {};
-        //     callback(new File());
-        // });
-
+        client._getSites(callback, defaultSiteID);
         location = {};
     });
 
@@ -66,48 +58,45 @@ describe('wp website archive', function() {
             done();
         };
 
-        client._archiveSingleSite(site, location, callback);
+        client._archiveSingleSite(defaultSite, location, callback);
     });
 
     it('should have created an archive for single website', function(done) {
-        var timeout = 60000;
-        this.timeout(timeout);
+        this.timeout(archiveCreationTimeout);
+        var checkFrequency = 2000;
 
         var callback = function(site, body, location) {
             assert(body.url !== '');
             done();
         };
 
-        client._waitForArchiveCreation(site, location, callback, timeout, 2000);
+        client._waitForArchiveCreation(defaultSite, callback, archiveCreationTimeout, checkFrequency);
+    });
+
+    it('should upload file to AWS S3', function(done) {
+        var checkFrequency = 2000;
+        this.timeout(archiveCreationTimeout);
+
+        var callback = function(site, url) {
+            var onRemoteUploadCompleteCallback = function(File) {
+                assert(typeof File !== 'undefined');
+                done();
+            };
+
+            client._copyArchiveToRemote(defaultSite, url, backupLocations.s3, onRemoteUploadCompleteCallback);
+        };
+
+        client._waitForArchiveCreation(defaultSite, callback, archiveCreationTimeout, checkFrequency);
     });
 
     it('should delete archive from original website', function(done) {
-        client._deleteSingleSiteArchive(site, {}, done);
-    });
-});
-
-
-describe('wp website archive', function() {
-    this.timeout(20000);
-    var site;
-
-    before(function(done) {
-        // Get first site id from all available sites
-        var callback = function(sites) {
-            site = sites[0];
-            done();
-        };
-
-        client._getSites(callback);
-    });
-
-
-    it('should upload file to AWS S3', function(done) {
-        var url = 'http://samplecsvs.s3.amazonaws.com/Sacramentorealestatetransactions.csv';
         var callback = function(site, File) {
             done();
         };
-
-        client._copyArchiveToRemote(site, url, backupLocations.s3, callback);
+        client._deleteSingleSiteArchive(defaultSite, {}, callback);
     });
+});
+
+after(function() {
+    server.close();
 });

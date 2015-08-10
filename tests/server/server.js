@@ -1,6 +1,7 @@
 var path = require('path');
 var fs = require('fs');
 var basePath = path.resolve('./tests/server/samples');
+var LOG = require(path.resolve('utils', 'log.js'));
 
 function loadResponseFile(fileName) {
     try {
@@ -35,11 +36,12 @@ function serveRequest(req, res) {
         res.status(200).json(data);
     } catch (e) {
         res.status(404).send(e.toString());
-        console.log(e.toString());
+        LOG(e.toString());
     }
 }
 
-function makeServer() {
+function makeServer(port) {
+    port = (port === undefined) ? 3000 : port;
     var express = require('express');
     var app = express();
 
@@ -47,9 +49,9 @@ function makeServer() {
     app.get('/:id', serveRequest);
     app.all('/:id/:action', serveRequest);
 
-    var server = app.listen(3000, function() {
+    var server = app.listen(port, function() {
         var port = server.address().port;
-        console.log('Example app listening at port %s', port);
+        LOG('Example app listening at port %s', port);
     });
 
     return server;
