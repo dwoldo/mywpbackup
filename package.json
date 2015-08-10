@@ -4,7 +4,9 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "NODE_ENV=test mocha tests/** && NODE_ENV="
+        "test": "NODE_ENV=test mocha tests/** && NODE_ENV=",
+        "start dev": "NODE_ENV=development node server.js",
+        "start prod": "NODE_ENV=production node server.js"
     },
     "author": "",
     "license": "ISC",

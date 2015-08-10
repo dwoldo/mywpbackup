@@ -55,6 +55,7 @@ var getArchiveURL = function(site, callback) {
 };
 
 var copyArchiveToRemote = function(site, archiveFileURL, location, callback) {
+    LOG('Attempting to copy the archive for', site.url, 'to remote');
     var instance = require(path.resolve('backup_modules', location.name));
     var backupInstance = new instance(location);
 
@@ -71,9 +72,8 @@ var deleteSingleSiteArchive = function(site, File, callback) {
 var backupArchive = function(site, location, body) {
     // Eventually we will attached location backup workflow to the actual location object
     var finished = function(site, fileArchiveURL) {
-        LOG("here!!!!!!!!!!!");
         var onArchiveUploaded = function(File) {
-            LOG('Backup archive uploaded to remote server');
+            LOG('Backup archive uploaded to remote server for', site.url);
             deleteSingleSiteArchive(site, File);
         };
 
